@@ -5,21 +5,20 @@ import json
 
 struct Extension {
 	version           string @[required]
-	relative_location string @[json: relativeLocation; required]
+	relative_location string @[json: 'relativeLocation'; required]
 
 	identifier struct {
 		id string @[required]
 	} @[required]
 
 	location struct {
-		// ! BUG: Cannot decode and encode $mid key
-		mid    int    @[json: mid]
+		mid    int    @[json: '\$mid'; required]
 		path   string @[required]
 		scheme string @[required]
 	} @[required]
 
 	metadata struct {
-		installed_timestamp i64    @[json: installedTimestamp; required]
+		installed_timestamp i64    @[json: 'installedTimestamp'; required]
 		source              string @[required]
 	} @[required]
 }
