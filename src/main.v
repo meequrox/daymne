@@ -31,6 +31,7 @@ fn print_local_extensions() {
 }
 
 fn print_info() {
+	println('Platform: ${get_current_platform()}')
 	println('Root path: ${get_root_path()}')
 	println('Config path: ${get_root_config_path()}')
 	println('Extensions count: ${get_local_extensions_list().len}')
