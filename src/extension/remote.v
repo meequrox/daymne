@@ -7,6 +7,8 @@ import semver
 import arrays
 import utils
 
+// TODO: remove pub
+
 pub enum RemoteQueryFlag {
 	include_versions             = 0x1
 	include_files                = 0x2

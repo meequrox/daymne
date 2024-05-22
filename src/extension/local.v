@@ -4,6 +4,8 @@ import os
 import json
 import utils
 
+// TODO: remove pub
+
 pub struct LocalExtension {
 pub:
 	version           string @[required]
