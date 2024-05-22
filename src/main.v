@@ -7,8 +7,7 @@ fn build_subcommands() []cli.Command {
 	return [
 		cli.Command{
 			name: 'info'
-			// TODO: add description
-			description: ''
+			description: 'Print information related to "Code - OSS"'
 			execute: fn (cmd cli.Command) ! {
 				info_handler()
 				return
@@ -25,8 +24,7 @@ fn build_subcommands() []cli.Command {
 		},
 		cli.Command{
 			name: 'list'
-			// TODO: add description
-			description: ''
+			description: 'Print installed extensions'
 			execute: fn (cmd cli.Command) ! {
 				list_handler()
 				return
@@ -43,8 +41,7 @@ fn build_subcommands() []cli.Command {
 		},
 		cli.Command{
 			name: 'update'
-			// TODO: add description
-			description: ''
+			description: 'Print extensions that can be updated to a newer version'
 			execute: fn (cmd cli.Command) ! {
 				update_handler()
 				return
@@ -62,8 +59,7 @@ fn build_subcommands() []cli.Command {
 		cli.Command{
 			// TODO: parse positional args
 			name: 'upgrade'
-			// TODO: add description
-			description: ''
+			description: 'Download and install a newer version of the extension(s)'
 			execute: fn (cmd cli.Command) ! {
 				upgrade_handler()
 				return
@@ -84,10 +80,8 @@ fn build_subcommands() []cli.Command {
 fn main() {
 	mut app := cli.Command{
 		name: 'daymne'
-		// TODO: add description
-		description: ''
-		// TODO: bump version
-		version: '0.3.0'
+		description: 'Command line extension updater for "Code - OSS" text editor'
+		version: '0.5.2'
 		execute: fn (cmd cli.Command) ! {
 			main_handler(cmd.help_message())
 			return
