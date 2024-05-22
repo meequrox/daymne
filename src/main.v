@@ -71,55 +71,76 @@ fn get_current_platform() string {
 }
 
 fn match_remote_extension(exts extension.RemoteExtensions) extension.RemoteExtension {
+	mut ext := extension.RemoteExtension{}
+
 	if exts.results.len > 0 && exts.results[0].result_metadata[0].metadata_items[0].count > 0 {
 		versions := exts.results[0].extensions[0].versions
 
-		mut ext := extension.RemoteExtension{
-			version: ''
-			package_url: ''
-		}
-
-		platform := get_current_platform()
-
 		for version in versions {
-			if version.target_platform == '' || version.target_platform == platform {
+			if version.target_platform == '' || version.target_platform == get_current_platform() {
 				ext.version = version.version
 				ext.package_url = find_package_url(version.files)
 				break
 			}
 		}
-
-		return ext
 	}
 
-	return extension.RemoteExtension{}
+	return ext
+}
+
+pub struct RemoteQueryConfig {
+pub:
+	filters []RemoteQueryConfigFilter
+	flags   int
+}
+
+struct RemoteQueryConfigFilter {
+	criteria []RemoteQueryConfigCriteria
+}
+
+struct RemoteQueryConfigCriteria {
+	filter_type int    @[json: 'filterType']
+	value       string
 }
 
 fn request_extension_from_remote(id string) extension.RemoteExtension {
 	query_flags := int(extension.RemoteQueryFlag.include_files) | int(extension.RemoteQueryFlag.include_installation_targets) | int(extension.RemoteQueryFlag.include_latest_version_only)
 
-	url := 'https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery'
-	body := '{"filters":[{"criteria":[{"filterType":7,"value":"${id}"}]}],"flags":${query_flags}}'
-	ua := 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) UpNote/9.3.0 Chrome/122.0.6261.156 Electron/29.3.1 Safari/537.36'
+	query_config := RemoteQueryConfig{
+		filters: [
+			RemoteQueryConfigFilter{
+				criteria: [
+					RemoteQueryConfigCriteria{
+						filter_type: 7
+						value: id
+					},
+				]
+			},
+		]
+		flags: query_flags
+	}
 
-	mut req := http.new_request(http.Method.post, url, body)
+	// TODO: open-vsx
+	url := 'https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery'
+
+	mut req := http.new_request(http.Method.post, url, json.encode(query_config))
 	req.add_header(http.CommonHeader.content_type, 'application/json')
 	req.add_header(http.CommonHeader.accept, 'application/json;api-version=3.0-preview.1')
-	req.add_header(http.CommonHeader.user_agent, ua)
+	req.add_header(http.CommonHeader.user_agent, 'VSCode 1.91.1')
 
 	req.read_timeout = 5 * time.second
 	req.write_timeout = req.read_timeout
 
-	println('${time.now()}: do req for ${id}')
+	println('${time.now()}: request ${id}')
 	resp := req.do() or { panic(err) }
 	time.sleep(100 * time.millisecond)
-	println('${time.now()}: end req for ${id}')
+	println('${time.now()}: got ${id}')
 
 	if resp.status() == http.Status.ok {
 		exts := json.decode(extension.RemoteExtensions, resp.body) or { panic(err) }
 		return match_remote_extension(exts)
 	} else {
-		// TODO: remove in release
+		// TODO: remove
 		println('Request extension from remote: code ${resp.status_code}; body ${resp.body}')
 	}
 
@@ -140,9 +161,6 @@ fn check_extensions_updates() {
 }
 
 // TODO: Move functions to packages
-// TODO: Install command
-// TODO: Upgrade (all) command
-// ? Pipe upgrade through install?
 
 fn main() {
 	default_cmd := fn (cmd cli.Command) ! {
@@ -166,9 +184,18 @@ fn main() {
 		}
 	}
 
-	check_cmd := cli.Command{
-		name: 'check'
+	update_cmd := cli.Command{
+		name: 'update'
 		execute: fn (cmd cli.Command) ! {
+			check_extensions_updates()
+			return
+		}
+	}
+
+	upgrade_cmd := cli.Command{
+		name: 'upgrade'
+		execute: fn (cmd cli.Command) ! {
+			// TODO: Upgrade (all) command
 			check_extensions_updates()
 			return
 		}
@@ -183,7 +210,8 @@ fn main() {
 		commands: [
 			info_cmd,
 			list_cmd,
-			check_cmd,
+			update_cmd,
+			upgrade_cmd,
 		]
 		defaults: struct {
 			help: cli.CommandFlag{
