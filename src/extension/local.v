@@ -1,5 +1,9 @@
 module extension
 
+import os
+import json
+import utils
+
 pub struct LocalExtension {
 pub:
 	version           string @[required]
@@ -31,4 +35,17 @@ struct LocalExtensionMetadata {
 pub:
 	installed_timestamp i64    @[json: 'installedTimestamp'; required]
 	source              string @[required]
+}
+
+pub fn get_local_extensions() []LocalExtension {
+	config_str := os.read_file(utils.get_root_config_path()) or { panic(err) }
+	list := json.decode([]LocalExtension, config_str) or { panic(err) }
+
+	return list.sorted(a.identifier.id < b.identifier.id)
+}
+
+pub fn print_local_extensions() {
+	for extension in get_local_extensions() {
+		println('${extension.identifier.id} ${extension.version}')
+	}
 }
