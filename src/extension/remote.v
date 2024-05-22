@@ -32,7 +32,7 @@ pub:
 	source     string
 }
 
-struct RemoteVersion {
+pub struct RemoteVersion {
 pub:
 	version         string
 	target_platform string        @[json: 'targetPlatform']
