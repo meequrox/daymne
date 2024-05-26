@@ -5,33 +5,28 @@ import utils
 import semver
 import os
 
-// TODO: remove pub
-
 pub struct LocalExtension {
 pub:
 	identifier        LocalExtensionIdentifier @[required]
 	location          LocalExtensionLocation   @[required]
 	relative_location string                   @[json: 'relativeLocation'; required]
 	version           string                   @[required]
-	metadata          LocalExtensionMetadata   @[required]
+	metadata          LocalExtensionMetadata
 }
 
-// ? pub struct
-struct LocalExtensionIdentifier {
+pub struct LocalExtensionIdentifier {
 pub:
 	id string @[required]
 }
 
-// ? pub struct
-struct LocalExtensionLocation {
+pub struct LocalExtensionLocation {
 pub:
 	mid    int    @[json: '\$mid'; required]
 	path   string @[required]
 	scheme string @[required]
 }
 
-// ? pub struct
-struct LocalExtensionMetadata {
+pub struct LocalExtensionMetadata {
 pub:
 	installed_timestamp i64    @[json: 'installedTimestamp'; required]
 	source              string @[required]
@@ -54,8 +49,8 @@ pub fn (ex LocalExtension) str() string {
 }
 
 pub fn get_local() []LocalExtension {
-	config_str := os.read_file(utils.get_config().file.path) or { '[]' }
-	list := json.decode([]LocalExtension, config_str) or { [] }
+	config_str := os.read_file(utils.get_config().file.path) or { panic(err) }
+	list := json.decode([]LocalExtension, config_str) or { panic(err) }
 
 	return list.sorted(a.identifier.id < b.identifier.id)
 }

@@ -4,6 +4,9 @@ import extension
 import utils
 import os
 import arrays
+import compress.szip
+import time
+import json
 
 fn main_handler(help_msg string) {
 	println(help_msg)
@@ -25,11 +28,11 @@ fn list_handler() {
 
 fn update_handler() {
 	count := arrays.fold(extension.get_local(), 0, fn (acc int, ex extension.LocalExtension) int {
-		local_version := ex.get_version()
-		remote_version := extension.get_remote(ex.get_id()).get_version()
+		local_ver := ex.get_version()
+		remote_ver := extension.get_remote(ex.get_id()).get_version()
 
-		if remote_version > local_version {
-			println('${ex.get_id()} ${local_version} -> ${remote_version}')
+		if remote_ver > local_ver {
+			println('${ex.get_id()} ${local_ver} -> ${remote_ver}')
 			return acc + 1
 		}
 
@@ -44,57 +47,117 @@ fn update_handler() {
 }
 
 fn upgrade_handler(args []string) {
-	// TODO: Implement upgrade (all) command
-	mut installed := extension.get_local()
-
-	mut candidates := map[string]int{}
-	mut candidates_ref := &candidates
-
-	if args.len > 0 {
-		arrays.each(args, fn [installed, mut candidates_ref] (candidate_id string) {
-			if candidate_id.len > 0 && candidate_id[0] != `-` && candidate_id.count('.') == 1 {
-				// Find candidate in list of installed extensions
-				idx := arrays.index_of_first(installed, fn [candidate_id] (_ int, ex extension.LocalExtension) bool {
-					return ex.get_id() == candidate_id
-				})
-
-				if idx > -1 {
-					(*candidates_ref)[candidate_id] = idx
-				}
-			}
-		})
-	} else {
-		arrays.each_indexed(installed, fn [mut candidates_ref] (idx int, ex extension.LocalExtension) {
-			(*candidates_ref)[ex.get_id()] = idx
-		})
-	}
-
-	for k, v in candidates {
-		println('${k} at ${v}')
-	}
-
+	mut installed, candidates := get_upgrade_candidates(args)
 	mut count := 0
 
-	for candidate_id, installed_idx in candidates {
-		remote_ext := extension.get_remote(candidate_id)
+	for cid, installed_idx in candidates {
+		remote_ext := extension.get_remote(cid)
 
-		local_version := installed[installed_idx].get_version()
-		remote_version := remote_ext.get_version()
+		local_ver := installed[installed_idx].get_version()
+		remote_ver := remote_ext.get_version()
 
-		if remote_version > local_version {
-			tmp_path := extension.download_package(remote_ext)
+		if remote_ver > local_ver {
+			tmp_file := extension.download_package(remote_ext)
+			old_dir, tmp_unpack_dir, tmp_ext_dir, new_dir := create_upgrade_paths(cid,
+				local_ver.str(), remote_ver.str(), tmp_file)
 
-			// TODO: Unpack and copy to config root
-			// TODO: Update config file
-			dst_path := os.join_path(os.home_dir(), 'Desktop', '${candidate_id}-${remote_version}.vsix')
-			os.cp(tmp_path, dst_path) or { panic(err) }
+			szip.extract_zip_to_dir(tmp_file, tmp_unpack_dir) or {
+				utils.update_config_file(json.encode_pretty(installed))
+				panic(err)
+			}
 
-			println('${candidate_id} ${local_version} -> ${remote_version} (moved from ${tmp_path} to ${dst_path})')
-			count++
+			if os.exists(tmp_ext_dir) {
+				os.mv(os.join_path_single(tmp_unpack_dir, 'extension.vsixmanifest'), os.join_path_single(tmp_ext_dir,
+					'.vsixmanifest'), os.MvParams{}) or {
+					utils.update_config_file(json.encode_pretty(installed))
+					panic(err)
+				}
+
+				os.cp_all(tmp_ext_dir, new_dir, false) or {
+					utils.update_config_file(json.encode_pretty(installed))
+					panic(err)
+				}
+
+				os.rmdir_all(old_dir) or {
+					utils.update_config_file(json.encode_pretty(installed))
+					panic(err)
+				}
+
+				// Update config file entry
+				installed[installed_idx] = extension.LocalExtension{
+					identifier: extension.LocalExtensionIdentifier{
+						id: cid
+					}
+					location: extension.LocalExtensionLocation{
+						mid: installed[installed_idx].location.mid
+						path: new_dir
+						scheme: installed[installed_idx].location.scheme
+					}
+					relative_location: '${cid}-${remote_ver}'
+					version: remote_ver.str()
+					metadata: extension.LocalExtensionMetadata{
+						installed_timestamp: time.now().unix_milli()
+						source: installed[installed_idx].metadata.source
+					}
+				}
+
+				println('${cid} ${local_ver} -> ${remote_ver}')
+				count++
+			}
 		}
 	}
 
 	if count > 0 {
-		println('\n${count} extensions was upgraded')
+		utils.update_config_file(json.encode_pretty(installed))
+		println('\n${count} extensions were upgraded')
 	}
+}
+
+fn get_upgrade_candidates(args []string) ([]extension.LocalExtension, map[string]int) {
+	installed := extension.get_local()
+	mut candidates := map[string]int{}
+
+	if args.len > 0 {
+		for cid in arrays.uniq(args) {
+			if is_valid_extension_id(cid) {
+				// Find candidate in list of installed extensions
+				idx := arrays.index_of_first(installed, fn [cid] (_ int, ex extension.LocalExtension) bool {
+					return ex.get_id() == cid
+				})
+
+				if idx > -1 {
+					candidates[cid] = idx
+				}
+			}
+		}
+	} else {
+		for idx, ex in installed {
+			candidates[ex.get_id()] = idx
+		}
+	}
+
+	return installed, candidates
+}
+
+fn is_valid_extension_id(id string) bool {
+	return id.len > 0 && id[0] != `-` && id.count('.') == 1
+}
+
+fn create_upgrade_paths(id string, local_ver string, remote_ver string, downloaded_file string) (string, string, string, string) {
+	config := utils.get_config()
+
+	old_dir := os.join_path_single(config.dir.path, '${id}-${local_ver}')
+	tmp_unpack_dir := downloaded_file + '_unpacked'
+	tmp_ext_dir := os.join_path_single(tmp_unpack_dir, 'extension')
+	new_dir := os.join_path_single(config.dir.path, '${id}-${remote_ver}')
+
+	if !config.dir.is_exist {
+		os.mkdir_all(config.dir.path, os.MkdirParams{ mode: 0o755 }) or { panic(err) }
+	}
+
+	if !os.exists(tmp_unpack_dir) {
+		os.mkdir(tmp_unpack_dir, os.MkdirParams{ mode: 0o755 }) or { panic(err) }
+	}
+
+	return old_dir, tmp_unpack_dir, tmp_ext_dir, new_dir
 }

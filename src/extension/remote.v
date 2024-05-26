@@ -8,8 +8,6 @@ import arrays
 import utils
 import io.util
 
-// TODO: remove pub
-
 pub enum RemoteQueryFlag {
 	include_versions             = 0x1
 	include_files                = 0x2
@@ -23,6 +21,12 @@ pub enum RemoteQueryFlag {
 	include_latest_version_only  = 0x200
 	unpublished                  = 0x1000
 	include_name_conflict_info   = 0x8000
+}
+
+pub struct RemoteQueryConfig {
+pub:
+	filters []RemoteQueryConfigFilter
+	flags   int
 }
 
 pub enum RemoteGallery {
@@ -55,37 +59,27 @@ pub:
 	files           []RemoteAsset
 }
 
-// ? pub struct
 struct RemoteResultMetadataItems {
 pub:
 	count int
 	name  string
 }
 
-// ? pub struct
 struct RemoteResultMetadata {
 pub:
 	metadata_items []RemoteResultMetadataItems @[json: 'metadataItems']
 	metadata_type  string                      @[json: 'metadataType']
 }
 
-// ? pub struct
 struct RemoteResultExtension {
 pub:
 	versions []RemoteVersion
 }
 
-// ? pub struct
 struct RemoteResult {
 pub:
 	extensions      []RemoteResultExtension
 	result_metadata []RemoteResultMetadata  @[json: 'resultMetadata']
-}
-
-pub struct RemoteQueryConfig {
-pub:
-	filters []RemoteQueryConfigFilter
-	flags   int
 }
 
 struct RemoteQueryConfigFilter {
@@ -101,13 +95,19 @@ pub fn (ex RemoteExtension) get_version() semver.Version {
 	return semver.from(ex.version) or { semver.build(0, 0, 0) }
 }
 
-fn (g RemoteGallery) str() string {
+pub fn (g RemoteGallery) str() string {
 	url := match g {
 		.vs { 'https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery' }
 		.openvsx { 'https://open-vsx.org/vscode/gallery/extensionquery' }
 	}
 
 	return url
+}
+
+pub fn combine_query_flags(flags []RemoteQueryFlag) int {
+	return arrays.fold(flags, 0, fn (acc int, flag RemoteQueryFlag) int {
+		return acc | int(flag)
+	})
 }
 
 pub fn get_remote(id string) RemoteExtension {
@@ -118,9 +118,9 @@ pub fn get_remote(id string) RemoteExtension {
 }
 
 pub fn download_package(ex RemoteExtension) string {
-	_, tmp_path := util.temp_file(util.TempFileOptions{ pattern: 'daymne_*_package' }) or {
-		panic(err)
-	}
+	_, tmp_path := util.temp_file(util.TempFileOptions{
+		pattern: 'daymne_*_${ex.id}-${ex.version}.vsix'
+	}) or { panic(err) }
 
 	http.download_file(ex.package_url, tmp_path) or { panic(err) }
 
@@ -154,7 +154,8 @@ fn match_remote_extension(exts RemoteExtensions, id string) RemoteExtension {
 }
 
 fn build_info_request(url string, id string) http.Request {
-	query_flags := int(RemoteQueryFlag.include_files) | int(RemoteQueryFlag.include_installation_targets) | int(RemoteQueryFlag.include_latest_version_only)
+	query_flags := combine_query_flags([.include_files, .include_installation_targets,
+		.include_latest_version_only])
 
 	query_config := RemoteQueryConfig{
 		filters: [
@@ -182,6 +183,7 @@ fn build_info_request(url string, id string) http.Request {
 	return req
 }
 
+// TODO: retry on fail
 fn request_remote_info(url string, id string) RemoteExtension {
 	resp := build_info_request(url, id).do() or { panic(err) }
 	time.sleep(100 * time.millisecond)

@@ -47,3 +47,7 @@ pub fn get_config() Config {
 		}
 	}
 }
+
+pub fn update_config_file(content string) {
+	os.write_file(get_config().file.path, content) or { panic(err) }
+}
