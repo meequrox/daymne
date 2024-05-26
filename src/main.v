@@ -61,7 +61,7 @@ fn build_subcommands() []cli.Command {
 			name: 'upgrade'
 			description: 'Download and install a newer version of the extension(s)'
 			execute: fn (cmd cli.Command) ! {
-				upgrade_handler()
+				upgrade_handler(cmd.args)
 				return
 			}
 			posix_mode: true
