@@ -2,6 +2,10 @@ module utils
 
 import v.pref
 
+pub fn get_current_platform() string {
+	return get_current_os() + '-' + get_current_arch()
+}
+
 fn get_current_os() string {
 	mut host_os := pref.get_host_os().str()
 
@@ -25,8 +29,4 @@ fn get_current_arch() string {
 	}
 
 	return arch
-}
-
-pub fn get_current_platform() string {
-	return get_current_os() + '-' + get_current_arch()
 }
