@@ -1,21 +1,19 @@
 module extension
 
-import os
 import json
 import utils
+import semver
+import os
 
 // TODO: remove pub
 
 pub struct LocalExtension {
 pub:
-	version           string @[required]
-	relative_location string @[json: 'relativeLocation'; required]
-
-	identifier LocalExtensionIdentifier @[required]
-
-	location LocalExtensionLocation @[required]
-
-	metadata LocalExtensionMetadata @[required]
+	identifier        LocalExtensionIdentifier @[required]
+	location          LocalExtensionLocation   @[required]
+	relative_location string                   @[json: 'relativeLocation'; required]
+	version           string                   @[required]
+	metadata          LocalExtensionMetadata   @[required]
 }
 
 // ? pub struct
@@ -39,15 +37,25 @@ pub:
 	source              string @[required]
 }
 
-pub fn get_local_extensions() []LocalExtension {
-	config_str := os.read_file(utils.get_root_config_path()) or { panic(err) }
-	list := json.decode([]LocalExtension, config_str) or { panic(err) }
-
-	return list.sorted(a.identifier.id < b.identifier.id)
+pub fn (ex LocalExtension) get_id() string {
+	return ex.identifier.id
 }
 
-pub fn print_local_extensions() {
-	for extension in get_local_extensions() {
-		println('${extension.identifier.id} ${extension.version}')
-	}
+pub fn (ex LocalExtension) get_path() string {
+	return ex.location.path
+}
+
+pub fn (ex LocalExtension) get_version() semver.Version {
+	return semver.from(ex.version) or { semver.build(0, 0, 0) }
+}
+
+pub fn (ex LocalExtension) str() string {
+	return '${ex.get_id()} ${ex.get_version()}'
+}
+
+pub fn get_local() []LocalExtension {
+	config_str := os.read_file(utils.get_config().file.path) or { '[]' }
+	list := json.decode([]LocalExtension, config_str) or { [] }
+
+	return list.sorted(a.identifier.id < b.identifier.id)
 }
