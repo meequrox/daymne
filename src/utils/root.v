@@ -2,10 +2,48 @@ module utils
 
 import os
 
-pub fn get_root_path() string {
-	return os.join_path(os.home_dir(), '.vscode-oss', 'extensions')
+pub struct Config {
+pub:
+	dir  ConfigDir
+	file ConfigFile
 }
 
-pub fn get_root_config_path() string {
-	return os.join_path_single(get_root_path(), 'extensions.json')
+pub struct ConfigDir {
+pub:
+	path     string
+	is_exist bool
+}
+
+pub struct ConfigFile {
+pub:
+	path     string
+	is_exist bool
+}
+
+pub fn (c Config) str() string {
+	return '${c.dir}\n${c.file}'
+}
+
+pub fn (cd ConfigDir) str() string {
+	return 'Config directory: ${cd.path} (exists: ${cd.is_exist})'
+}
+
+pub fn (cf ConfigFile) str() string {
+	return 'Config file: ${cf.path} (exists: ${cf.is_exist})'
+}
+
+pub fn get_config() Config {
+	dir_path := os.join_path(os.home_dir(), '.vscode-oss', 'extensions')
+	file_path := os.join_path_single(dir_path, 'extensions.json')
+
+	return Config{
+		dir: ConfigDir{
+			path: dir_path
+			is_exist: os.exists(dir_path)
+		}
+		file: ConfigFile{
+			path: file_path
+			is_exist: os.exists(file_path)
+		}
+	}
 }
