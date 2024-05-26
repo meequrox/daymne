@@ -57,7 +57,6 @@ fn build_subcommands() []cli.Command {
 			}
 		},
 		cli.Command{
-			// TODO: parse positional args
 			name: 'upgrade'
 			description: 'Download and install a newer version of the extension(s)'
 			execute: fn (cmd cli.Command) ! {
@@ -81,7 +80,7 @@ fn main() {
 	mut app := cli.Command{
 		name: 'daymne'
 		description: 'Command line extension updater for "Code - OSS" text editor'
-		version: '0.5.2'
+		version: '0.6.0'
 		execute: fn (cmd cli.Command) ! {
 			main_handler(cmd.help_message())
 			return
