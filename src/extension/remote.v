@@ -4,11 +4,10 @@ import net.http
 import time
 import json
 import semver
-import arrays
 import utils
 import io.util
 
-pub enum RemoteQueryFlag {
+enum RemoteQueryFlag {
 	include_versions             = 0x1
 	include_files                = 0x2
 	include_category_and_tags    = 0x4
@@ -23,17 +22,6 @@ pub enum RemoteQueryFlag {
 	include_name_conflict_info   = 0x8000
 }
 
-pub struct RemoteQueryConfig {
-pub:
-	filters []RemoteQueryConfigFilter
-	flags   int
-}
-
-pub enum RemoteGallery {
-	vs      = 0
-	openvsx
-}
-
 pub struct RemoteExtension {
 pub mut:
 	id          string
@@ -41,43 +29,46 @@ pub mut:
 	package_url string
 }
 
-pub struct RemoteExtensions {
-pub:
+struct RemoteQueryConfig {
+	filters []RemoteQueryConfigFilter
+	flags   int
+}
+
+enum RemoteGallery {
+	vs      = 0
+	openvsx
+}
+
+struct RemoteExtensions {
 	results []RemoteResult
 }
 
-pub struct RemoteAsset {
-pub:
+struct RemoteAsset {
 	asset_type string @[json: 'assetType']
 	source     string
 }
 
-pub struct RemoteVersion {
-pub:
+struct RemoteVersion {
 	version         string
 	target_platform string        @[json: 'targetPlatform']
 	files           []RemoteAsset
 }
 
 struct RemoteResultMetadataItems {
-pub:
 	count int
 	name  string
 }
 
 struct RemoteResultMetadata {
-pub:
 	metadata_items []RemoteResultMetadataItems @[json: 'metadataItems']
 	metadata_type  string                      @[json: 'metadataType']
 }
 
 struct RemoteResultExtension {
-pub:
 	versions []RemoteVersion
 }
 
 struct RemoteResult {
-pub:
 	extensions      []RemoteResultExtension
 	result_metadata []RemoteResultMetadata  @[json: 'resultMetadata']
 }
@@ -105,49 +96,94 @@ pub fn (g RemoteGallery) str() string {
 }
 
 pub fn combine_query_flags(flags []RemoteQueryFlag) int {
-	return arrays.fold(flags, 0, fn (acc int, flag RemoteQueryFlag) int {
-		return acc | int(flag)
-	})
+	mut res := 0
+
+	for flag in flags {
+		res |= int(flag)
+	}
+
+	return res
 }
 
 pub fn get_remote(id string) RemoteExtension {
-	openvsx_ext := request_remote_info(RemoteGallery.openvsx.str(), id)
-	vs_ext := request_remote_info(RemoteGallery.vs.str(), id)
+	galleries := [RemoteGallery.openvsx, RemoteGallery.vs]
+	mut ext := RemoteExtension{}
 
-	return if openvsx_ext.get_version() >= vs_ext.get_version() { openvsx_ext } else { vs_ext }
+	// Pick extension with newest version
+	for gallery in galleries {
+		candidate := request_remote_info(gallery.str(), id) or {
+			println('Cannot fetch ${id} from ${gallery}')
+			RemoteExtension{}
+		}
+
+		if candidate.get_version() > ext.get_version() {
+			ext = candidate
+		}
+	}
+
+	return ext
 }
 
-pub fn download_package(ex RemoteExtension) string {
-	_, tmp_path := util.temp_file(util.TempFileOptions{
+pub fn download_package(ex RemoteExtension) ?string {
+	return download_package_impl(ex, 0)
+}
+
+fn download_package_impl(ex RemoteExtension, attempt int) ?string {
+	tmp_opts := util.TempFileOptions{
 		pattern: 'daymne_*_${ex.id}-${ex.version}.vsix'
-	}) or { panic(err) }
+	}
 
-	http.download_file(ex.package_url, tmp_path) or { panic(err) }
+	_, path := util.temp_file(tmp_opts) or {
+		println('Failed to create temporary file for ${ex.id}: ${err}')
+		return none
+	}
 
-	return tmp_path
+	http.download_file(ex.package_url, path) or {
+		println('Failed to download ${ex.id}: ${err}')
+		return if attempt < 2 { download_package_impl(ex, attempt + 1) } else { none }
+	}
+
+	return path
 }
 
-fn find_package_url(assets []RemoteAsset) string {
-	package_asset := arrays.find_first(assets, fn (asset RemoteAsset) bool {
-		return asset.asset_type == 'Microsoft.VisualStudio.Services.VSIXPackage'
-	}) or { RemoteAsset{} }
+fn find_package_url(assets []RemoteAsset) ?string {
+	for asset in assets {
+		if asset.asset_type == 'Microsoft.VisualStudio.Services.VSIXPackage' {
+			return asset.source
+		}
+	}
 
-	return package_asset.source
+	return none
+}
+
+fn find_compatible_version(versions []RemoteVersion) ?RemoteVersion {
+	platform := utils.get_current_platform()
+
+	for ver in versions {
+		if ver.target_platform.len == 0 || ver.target_platform == platform {
+			return ver
+		}
+	}
+
+	return none
 }
 
 fn match_remote_extension(exts RemoteExtensions, id string) RemoteExtension {
 	mut ext := RemoteExtension{}
 
 	if exts.results.len > 0 && exts.results[0].extensions.len > 0 {
-		versions := exts.results[0].extensions[0].versions
-		compatible_version := arrays.find_first(versions, fn (version RemoteVersion) bool {
-			return version.target_platform == ''
-				|| version.target_platform == utils.get_current_platform()
-		}) or { RemoteVersion{} }
+		compatible_version := find_compatible_version(exts.results[0].extensions[0].versions) or {
+			println('Cannot find compatible version of ${id}')
+			RemoteVersion{}
+		}
 
 		ext.id = id
 		ext.version = compatible_version.version
-		ext.package_url = find_package_url(compatible_version.files)
+
+		ext.package_url = find_package_url(compatible_version.files) or {
+			println('Cannot find download URL for ${id}')
+			''
+		}
 	}
 
 	return ext
@@ -176,24 +212,34 @@ fn build_info_request(url string, id string) http.Request {
 	req.add_header(http.CommonHeader.accept, 'application/json;api-version=3.0-preview.1')
 	req.add_header(http.CommonHeader.user_agent, 'VSCode 1.91.1')
 
-	// TODO: SSL not implemented
-	req.read_timeout = 5 * time.second
-	req.write_timeout = req.read_timeout
+	req.read_timeout = 4 * time.second
+	req.write_timeout = 4 * time.second
 
 	return req
 }
 
-// TODO: retry on fail
-fn request_remote_info(url string, id string) RemoteExtension {
-	resp := build_info_request(url, id).do() or { panic(err) }
+fn request_remote_info(url string, id string) ?RemoteExtension {
+	return request_remote_info_impl(url, id, 0)
+}
+
+fn request_remote_info_impl(url string, id string, attempt int) ?RemoteExtension {
+	resp := build_info_request(url, id).do() or {
+		println('Failed to request remote ${url} for ${id}: ${err}')
+		return none
+	}
+
 	time.sleep(100 * time.millisecond)
 
 	if resp.status() == http.Status.ok {
-		exts := json.decode(RemoteExtensions, resp.body) or { RemoteExtensions{} }
+		exts := json.decode(RemoteExtensions, resp.body) or {
+			println('Failed to parse response for ${id} from ${url}: ${err}')
+			RemoteExtensions{}
+		}
+
 		return match_remote_extension(exts, id)
 	} else {
-		println('Request extension from remote: code ${resp.status_code}; body ${resp.body}')
+		println('Failed to request ${id}: ${url} => code ${resp.status_code} (attempt ${attempt + 1})')
 	}
 
-	return RemoteExtension{}
+	return if attempt < 2 { request_remote_info_impl(url, id, attempt + 1) } else { none }
 }

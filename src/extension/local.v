@@ -41,7 +41,10 @@ pub fn (ex LocalExtension) get_path() string {
 }
 
 pub fn (ex LocalExtension) get_version() semver.Version {
-	return semver.from(ex.version) or { semver.build(0, 0, 0) }
+	return semver.from(ex.version) or {
+		println('Failed to parse ${ex.get_id()} local version: ${err}')
+		semver.build(0, 0, 0)
+	}
 }
 
 pub fn (ex LocalExtension) str() string {
@@ -49,8 +52,22 @@ pub fn (ex LocalExtension) str() string {
 }
 
 pub fn get_local() []LocalExtension {
-	config_str := os.read_file(utils.get_config().file.path) or { panic(err) }
-	list := json.decode([]LocalExtension, config_str) or { panic(err) }
+	config_path := utils.get_config().file.path
+
+	if !os.exists(config_path) {
+		println('Config file does not exist: ${config_path}')
+		exit(0)
+	}
+
+	config_str := os.read_file(config_path) or {
+		println('Failed to read config file: ${err}')
+		exit(-1)
+	}
+
+	list := json.decode([]LocalExtension, config_str) or {
+		println('Failed to parse config file: ${err}')
+		exit(-1)
+	}
 
 	return list.sorted(a.identifier.id < b.identifier.id)
 }

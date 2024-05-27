@@ -10,14 +10,14 @@ pub:
 
 pub struct ConfigDir {
 pub:
-	path     string
-	is_exist bool
+	path   string
+	exists bool
 }
 
 pub struct ConfigFile {
 pub:
-	path     string
-	is_exist bool
+	path   string
+	exists bool
 }
 
 pub fn (c Config) str() string {
@@ -25,11 +25,11 @@ pub fn (c Config) str() string {
 }
 
 pub fn (cd ConfigDir) str() string {
-	return 'Config directory: ${cd.path} (exists: ${cd.is_exist})'
+	return 'Config directory: ${cd.path} (exists: ${cd.exists})'
 }
 
 pub fn (cf ConfigFile) str() string {
-	return 'Config file: ${cf.path} (exists: ${cf.is_exist})'
+	return 'Config file: ${cf.path} (exists: ${cf.exists})'
 }
 
 pub fn get_config() Config {
@@ -39,15 +39,18 @@ pub fn get_config() Config {
 	return Config{
 		dir: ConfigDir{
 			path: dir_path
-			is_exist: os.exists(dir_path)
+			exists: os.exists(dir_path)
 		}
 		file: ConfigFile{
 			path: file_path
-			is_exist: os.exists(file_path)
+			exists: os.exists(file_path)
 		}
 	}
 }
 
-pub fn update_config_file(content string) {
-	os.write_file(get_config().file.path, content) or { panic(err) }
+pub fn rewrite_config_file(content string) {
+	os.write_file(get_config().file.path, content) or {
+		println('Failed to rewrite config file: ${err}')
+		exit(-1)
+	}
 }

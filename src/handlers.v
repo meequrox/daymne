@@ -21,23 +21,23 @@ fn info_handler() {
 }
 
 fn list_handler() {
-	arrays.each(extension.get_local(), fn (ex extension.LocalExtension) {
+	for ex in extension.get_local() {
 		println(ex)
-	})
+	}
 }
 
 fn update_handler() {
-	count := arrays.fold(extension.get_local(), 0, fn (acc int, ex extension.LocalExtension) int {
+	mut count := 0
+
+	for ex in extension.get_local() {
 		local_ver := ex.get_version()
 		remote_ver := extension.get_remote(ex.get_id()).get_version()
 
 		if remote_ver > local_ver {
 			println('${ex.get_id()} ${local_ver} -> ${remote_ver}')
-			return acc + 1
+			count++
 		}
-
-		return acc
-	})
+	}
 
 	if count > 0 {
 		println('\n${count} extensions can be upgraded using `${os.args[0]} upgrade`')
@@ -47,6 +47,8 @@ fn update_handler() {
 }
 
 fn upgrade_handler(args []string) {
+	// TODO: refactor
+	// TODO: delete by relative directory
 	mut installed, candidates := get_upgrade_candidates(args)
 	mut count := 0
 
@@ -57,29 +59,30 @@ fn upgrade_handler(args []string) {
 		remote_ver := remote_ext.get_version()
 
 		if remote_ver > local_ver {
-			tmp_file := extension.download_package(remote_ext)
+			tmp_file := extension.download_package(remote_ext) or { continue }
+
 			old_dir, tmp_unpack_dir, tmp_ext_dir, new_dir := create_upgrade_paths(cid,
 				local_ver.str(), remote_ver.str(), tmp_file)
 
 			szip.extract_zip_to_dir(tmp_file, tmp_unpack_dir) or {
-				utils.update_config_file(json.encode_pretty(installed))
+				utils.rewrite_config_file(json.encode_pretty(installed))
 				panic(err)
 			}
 
 			if os.exists(tmp_ext_dir) {
 				os.mv(os.join_path_single(tmp_unpack_dir, 'extension.vsixmanifest'), os.join_path_single(tmp_ext_dir,
 					'.vsixmanifest'), os.MvParams{}) or {
-					utils.update_config_file(json.encode_pretty(installed))
+					utils.rewrite_config_file(json.encode_pretty(installed))
 					panic(err)
 				}
 
 				os.cp_all(tmp_ext_dir, new_dir, false) or {
-					utils.update_config_file(json.encode_pretty(installed))
+					utils.rewrite_config_file(json.encode_pretty(installed))
 					panic(err)
 				}
 
 				os.rmdir_all(old_dir) or {
-					utils.update_config_file(json.encode_pretty(installed))
+					utils.rewrite_config_file(json.encode_pretty(installed))
 					panic(err)
 				}
 
@@ -108,7 +111,7 @@ fn upgrade_handler(args []string) {
 	}
 
 	if count > 0 {
-		utils.update_config_file(json.encode_pretty(installed))
+		utils.rewrite_config_file(json.encode_pretty(installed))
 		println('\n${count} extensions were upgraded')
 	}
 }
@@ -119,7 +122,7 @@ fn get_upgrade_candidates(args []string) ([]extension.LocalExtension, map[string
 
 	if args.len > 0 {
 		for cid in arrays.uniq(args) {
-			if is_valid_extension_id(cid) {
+			if cid.len > 0 && cid[0] != `-` && cid.count('.') == 1 {
 				// Find candidate in list of installed extensions
 				idx := arrays.index_of_first(installed, fn [cid] (_ int, ex extension.LocalExtension) bool {
 					return ex.get_id() == cid
@@ -131,6 +134,7 @@ fn get_upgrade_candidates(args []string) ([]extension.LocalExtension, map[string
 			}
 		}
 	} else {
+		// Upgrade all
 		for idx, ex in installed {
 			candidates[ex.get_id()] = idx
 		}
@@ -139,11 +143,8 @@ fn get_upgrade_candidates(args []string) ([]extension.LocalExtension, map[string
 	return installed, candidates
 }
 
-fn is_valid_extension_id(id string) bool {
-	return id.len > 0 && id[0] != `-` && id.count('.') == 1
-}
-
 fn create_upgrade_paths(id string, local_ver string, remote_ver string, downloaded_file string) (string, string, string, string) {
+	// TODO: refactor
 	config := utils.get_config()
 
 	old_dir := os.join_path_single(config.dir.path, '${id}-${local_ver}')
@@ -151,7 +152,7 @@ fn create_upgrade_paths(id string, local_ver string, remote_ver string, download
 	tmp_ext_dir := os.join_path_single(tmp_unpack_dir, 'extension')
 	new_dir := os.join_path_single(config.dir.path, '${id}-${remote_ver}')
 
-	if !config.dir.is_exist {
+	if !config.dir.exists {
 		os.mkdir_all(config.dir.path, os.MkdirParams{ mode: 0o755 }) or { panic(err) }
 	}
 
