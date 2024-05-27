@@ -1,52 +1,15 @@
-module main
+module handler
 
 import extension
 import utils
+// ^^ local
 import os
-import arrays
 import compress.szip
-import time
 import json
+import time
+import arrays
 
-fn main_handler(help_msg string) {
-	println(help_msg)
-}
-
-fn info_handler() {
-	config := utils.get_config()
-
-	println(config)
-	println('Extensions: ${extension.get_local().len}')
-	println('Platform: ${utils.get_current_platform()}')
-}
-
-fn list_handler() {
-	for ex in extension.get_local() {
-		println(ex)
-	}
-}
-
-fn update_handler() {
-	mut count := 0
-
-	for ex in extension.get_local() {
-		local_ver := ex.get_version()
-		remote_ver := extension.get_remote(ex.get_id()).get_version()
-
-		if remote_ver > local_ver {
-			println('${ex.get_id()} ${local_ver} -> ${remote_ver}')
-			count++
-		}
-	}
-
-	if count > 0 {
-		println('\n${count} extensions can be upgraded using `${os.args[0]} upgrade`')
-	} else {
-		println('All extensions are up-to-date')
-	}
-}
-
-fn upgrade_handler(args []string) {
+pub fn upgrade(args []string) {
 	// TODO: refactor
 	// TODO: delete by relative directory
 	mut installed, candidates := get_upgrade_candidates(args)

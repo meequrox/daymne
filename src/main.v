@@ -1,5 +1,7 @@
 module main
 
+import handler
+// ^^ local
 import os
 import cli
 
@@ -9,7 +11,7 @@ fn build_subcommands() []cli.Command {
 			name: 'info'
 			description: 'Print information related to "Code - OSS"'
 			execute: fn (cmd cli.Command) ! {
-				info_handler()
+				handler.info()
 				return
 			}
 			posix_mode: true
@@ -26,7 +28,7 @@ fn build_subcommands() []cli.Command {
 			name: 'list'
 			description: 'Print installed extensions'
 			execute: fn (cmd cli.Command) ! {
-				list_handler()
+				handler.list()
 				return
 			}
 			posix_mode: true
@@ -43,7 +45,7 @@ fn build_subcommands() []cli.Command {
 			name: 'update'
 			description: 'Print extensions that can be updated to a newer version'
 			execute: fn (cmd cli.Command) ! {
-				update_handler()
+				handler.update()
 				return
 			}
 			posix_mode: true
@@ -60,7 +62,7 @@ fn build_subcommands() []cli.Command {
 			name: 'upgrade'
 			description: 'Download and install a newer version of the extension(s)'
 			execute: fn (cmd cli.Command) ! {
-				upgrade_handler(cmd.args)
+				handler.upgrade(cmd.args)
 				return
 			}
 			posix_mode: true
@@ -82,7 +84,7 @@ fn main() {
 		description: 'Command line extension updater for "Code - OSS" text editor'
 		version: '0.6.0'
 		execute: fn (cmd cli.Command) ! {
-			main_handler(cmd.help_message())
+			handler.main(cmd.help_message())
 			return
 		}
 		commands: build_subcommands()

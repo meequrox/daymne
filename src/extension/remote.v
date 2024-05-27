@@ -1,10 +1,11 @@
 module extension
 
+import utils
+// ^^ local
 import net.http
 import time
 import json
 import semver
-import utils
 import io.util
 
 enum RemoteQueryFlag {

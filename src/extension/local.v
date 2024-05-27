@@ -1,7 +1,8 @@
 module extension
 
-import json
 import utils
+// ^^ local
+import json
 import semver
 import os
 
