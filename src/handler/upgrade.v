@@ -9,119 +9,161 @@ import json
 import time
 import arrays
 
+struct UpgradePaths {
+	install  InstallDir
+	temp     TempDir
+	manifest ManifestPath
+}
+
+struct InstallDir {
+	old string
+	new string
+}
+
+struct TempDir {
+	unpack    string
+	extension string
+}
+
+struct ManifestPath {
+	old string
+	new string
+}
+
+struct UpgradeCandidate {
+	id   string
+	path string
+	pos  int // Entry position in original config file
+}
+
 pub fn upgrade(args []string) {
-	// TODO: refactor
-	// TODO: delete by relative directory
 	mut installed, candidates := get_upgrade_candidates(args)
 	mut count := 0
 
-	for cid, installed_idx in candidates {
-		remote_ext := extension.get_remote(cid)
+	for c in candidates {
+		remote_ext := extension.get_remote(c.id)
 
-		local_ver := installed[installed_idx].get_version()
+		local_ver := installed[c.pos].get_version()
 		remote_ver := remote_ext.get_version()
 
 		if remote_ver > local_ver {
 			tmp_file := extension.download_package(remote_ext) or { continue }
+			paths := create_upgrade_paths(c, local_ver.str(), remote_ver.str(), tmp_file)
 
-			old_dir, tmp_unpack_dir, tmp_ext_dir, new_dir := create_upgrade_paths(cid,
-				local_ver.str(), remote_ver.str(), tmp_file)
-
-			szip.extract_zip_to_dir(tmp_file, tmp_unpack_dir) or {
-				utils.rewrite_config_file(json.encode_pretty(installed))
-				panic(err)
+			szip.extract_zip_to_dir(tmp_file, paths.temp.unpack) or {
+				println('Failed to extract archive of ${c.id}: ${err}')
+				continue
 			}
 
-			if os.exists(tmp_ext_dir) {
-				os.mv(os.join_path_single(tmp_unpack_dir, 'extension.vsixmanifest'), os.join_path_single(tmp_ext_dir,
-					'.vsixmanifest'), os.MvParams{}) or {
-					utils.rewrite_config_file(json.encode_pretty(installed))
-					panic(err)
+			for src, dest in {
+				paths.manifest.old:   paths.manifest.new
+				paths.temp.extension: paths.install.new
+			} {
+				os.mv(src, dest, os.MvParams{ overwrite: true }) or {
+					println('Failed to install extension files for ${c.id}: ${err}')
+					continue
 				}
-
-				os.cp_all(tmp_ext_dir, new_dir, false) or {
-					utils.rewrite_config_file(json.encode_pretty(installed))
-					panic(err)
-				}
-
-				os.rmdir_all(old_dir) or {
-					utils.rewrite_config_file(json.encode_pretty(installed))
-					panic(err)
-				}
-
-				// Update config file entry
-				installed[installed_idx] = extension.LocalExtension{
-					identifier: extension.LocalExtensionIdentifier{
-						id: cid
-					}
-					location: extension.LocalExtensionLocation{
-						mid: installed[installed_idx].location.mid
-						path: new_dir
-						scheme: installed[installed_idx].location.scheme
-					}
-					relative_location: '${cid}-${remote_ver}'
-					version: remote_ver.str()
-					metadata: extension.LocalExtensionMetadata{
-						installed_timestamp: time.now().unix_milli()
-						source: installed[installed_idx].metadata.source
-					}
-				}
-
-				println('${cid} ${local_ver} -> ${remote_ver}')
-				count++
 			}
+
+			os.rm(tmp_file) or { println('Failed to remove temp .vsix package of ${c.id}: ${err}') }
+
+			for path in [paths.temp.unpack, paths.install.old] {
+				if os.exists(path) {
+					os.rmdir_all(paths.install.old) or {
+						println('Failed to remove directory ${path}: ${err}')
+					}
+				}
+			}
+
+			// Update config file entry
+			installed[c.pos] = extension.LocalExtension{
+				identifier: extension.LocalExtensionIdentifier{
+					id: c.id
+				}
+				location: extension.LocalExtensionLocation{
+					mid: installed[c.pos].location.mid
+					path: paths.install.new
+					scheme: installed[c.pos].location.scheme
+				}
+				relative_location: '${c.id}-${remote_ver}'
+				version: remote_ver.str()
+				metadata: extension.LocalExtensionMetadata{
+					installed_timestamp: time.now().unix_milli()
+					source: installed[c.pos].metadata.source
+				}
+			}
+
+			utils.rewrite_config_file(json.encode_pretty(installed))
+
+			println('${c.id} ${local_ver} -> ${remote_ver}')
+			count++
 		}
 	}
 
 	if count > 0 {
-		utils.rewrite_config_file(json.encode_pretty(installed))
 		println('\n${count} extensions were upgraded')
 	}
 }
 
-fn get_upgrade_candidates(args []string) ([]extension.LocalExtension, map[string]int) {
+fn get_upgrade_candidates(args []string) ([]extension.LocalExtension, []UpgradeCandidate) {
 	installed := extension.get_local()
-	mut candidates := map[string]int{}
+	mut candidates := []UpgradeCandidate{}
 
 	if args.len > 0 {
 		for cid in arrays.uniq(args) {
-			if cid.len > 0 && cid[0] != `-` && cid.count('.') == 1 {
+			if cid[0] != `-` && cid.count('.') == 1 {
 				// Find candidate in list of installed extensions
 				idx := arrays.index_of_first(installed, fn [cid] (_ int, ex extension.LocalExtension) bool {
 					return ex.get_id() == cid
 				})
 
 				if idx > -1 {
-					candidates[cid] = idx
+					candidates << UpgradeCandidate{
+						id: cid
+						path: installed[idx].get_path()
+						pos: idx
+					}
 				}
 			}
 		}
 	} else {
 		// Upgrade all
 		for idx, ex in installed {
-			candidates[ex.get_id()] = idx
+			candidates << UpgradeCandidate{
+				id: ex.get_id()
+				path: ex.get_path()
+				pos: idx
+			}
 		}
 	}
 
 	return installed, candidates
 }
 
-fn create_upgrade_paths(id string, local_ver string, remote_ver string, downloaded_file string) (string, string, string, string) {
-	// TODO: refactor
+fn create_upgrade_paths(candidate UpgradeCandidate, local_ver string, remote_ver string, downloaded_file string) UpgradePaths {
 	config := utils.get_config()
 
-	old_dir := os.join_path_single(config.dir.path, '${id}-${local_ver}')
-	tmp_unpack_dir := downloaded_file + '_unpacked'
-	tmp_ext_dir := os.join_path_single(tmp_unpack_dir, 'extension')
-	new_dir := os.join_path_single(config.dir.path, '${id}-${remote_ver}')
-
-	if !config.dir.exists {
-		os.mkdir_all(config.dir.path, os.MkdirParams{ mode: 0o755 }) or { panic(err) }
+	paths := UpgradePaths{
+		install: InstallDir{
+			old: candidate.path
+			new: os.join_path_single(config.dir.path, '${candidate.id}-${remote_ver}')
+		}
+		temp: TempDir{
+			unpack: downloaded_file + '_unpacked'
+			extension: os.join_path_single(downloaded_file + '_unpacked', 'extension')
+		}
+		manifest: ManifestPath{
+			old: os.join_path_single(downloaded_file + '_unpacked', 'extension.vsixmanifest')
+			new: os.join_path(downloaded_file + '_unpacked', 'extension', '.vsixmanifest')
+		}
 	}
 
-	if !os.exists(tmp_unpack_dir) {
-		os.mkdir(tmp_unpack_dir, os.MkdirParams{ mode: 0o755 }) or { panic(err) }
+	for path in [config.dir.path, paths.temp.unpack] {
+		os.mkdir_all(path, os.MkdirParams{ mode: 0o755 }) or {
+			println('Failed to create path ${path}: ${err}')
+			continue
+		}
 	}
 
-	return old_dir, tmp_unpack_dir, tmp_ext_dir, new_dir
+	return paths
 }

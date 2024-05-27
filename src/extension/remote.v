@@ -144,6 +144,8 @@ fn download_package_impl(ex RemoteExtension, attempt int) ?string {
 		return if attempt < 2 { download_package_impl(ex, attempt + 1) } else { none }
 	}
 
+	time.sleep(25 * time.millisecond)
+
 	return path
 }
 
@@ -158,10 +160,10 @@ fn find_package_url(assets []RemoteAsset) ?string {
 }
 
 fn find_compatible_version(versions []RemoteVersion) ?RemoteVersion {
-	platform := utils.get_current_platform()
+	platforms := ['', 'universal', utils.get_current_platform()]
 
 	for ver in versions {
-		if ver.target_platform.len == 0 || ver.target_platform == platform {
+		if ver.target_platform in platforms {
 			return ver
 		}
 	}
@@ -229,7 +231,7 @@ fn request_remote_info_impl(url string, id string, attempt int) ?RemoteExtension
 		return none
 	}
 
-	time.sleep(100 * time.millisecond)
+	time.sleep(50 * time.millisecond)
 
 	if resp.status() == http.Status.ok {
 		exts := json.decode(RemoteExtensions, resp.body) or {
