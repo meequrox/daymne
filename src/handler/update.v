@@ -10,6 +10,8 @@ pub fn update() {
 		local_ver := ex.get_version()
 		remote_ver := extension.get_remote(ex.get_id()).get_version()
 
+		println('Processing ${ex.get_id()}...')
+
 		if remote_ver > local_ver {
 			println('${ex.get_id()} ${local_ver} -> ${remote_ver}')
 			count++
@@ -19,6 +21,6 @@ pub fn update() {
 	if count > 0 {
 		println('\n${count} extensions can be upgraded using `${os.args[0]} upgrade`')
 	} else {
-		println('All extensions are up-to-date')
+		println('\nAll extensions are up-to-date')
 	}
 }

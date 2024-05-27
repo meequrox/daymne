@@ -42,7 +42,7 @@ pub fn (ex LocalExtension) get_path() string {
 
 pub fn (ex LocalExtension) get_version() semver.Version {
 	return semver.from(ex.version) or {
-		println('Failed to parse ${ex.get_id()} local version: ${err}')
+		eprintln('Failed to parse ${ex.get_id()} local version: ${err}')
 		semver.build(0, 0, 0)
 	}
 }
@@ -55,17 +55,17 @@ pub fn get_local() []LocalExtension {
 	config_path := utils.get_config().file.path
 
 	if !os.exists(config_path) {
-		println('Config file does not exist: ${config_path}')
+		eprintln('Config file does not exist: ${config_path}')
 		exit(0)
 	}
 
 	config_str := os.read_file(config_path) or {
-		println('Failed to read config file: ${err}')
+		eprintln('Failed to read config file: ${err}')
 		exit(-1)
 	}
 
 	list := json.decode([]LocalExtension, config_str) or {
-		println('Failed to parse config file: ${err}')
+		eprintln('Failed to parse config file: ${err}')
 		exit(-1)
 	}
 

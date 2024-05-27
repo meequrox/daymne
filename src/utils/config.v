@@ -50,7 +50,7 @@ pub fn get_config() Config {
 
 pub fn rewrite_config_file(content string) {
 	os.write_file(get_config().file.path, content) or {
-		println('Failed to rewrite config file: ${err}')
+		eprintln('Failed to rewrite config file: ${err}')
 		exit(-1)
 	}
 }

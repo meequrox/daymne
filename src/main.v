@@ -81,7 +81,7 @@ fn main() {
 	mut app := cli.Command{
 		name: 'daymne'
 		description: 'Command line extension updater for "Code - OSS" text editor'
-		version: '1.0.0'
+		version: '1.0.2'
 		execute: fn (cmd cli.Command) ! {
 			handler.main(cmd.help_message())
 			return

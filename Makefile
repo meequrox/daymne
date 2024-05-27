@@ -5,7 +5,7 @@ BUILD_DIR = build
 SRC_FILES = $(shell find $(SRC_DIR) -name '*.v')
 
 V = v
-VFLAGS = -stats
+VFLAGS = -W -prod -stats
 
 .PHONY: all clean test build run
 all: build

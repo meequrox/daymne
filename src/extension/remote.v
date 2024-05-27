@@ -112,7 +112,7 @@ pub fn get_remote(id string) RemoteExtension {
 	// Pick extension with newest version
 	for gallery in galleries {
 		candidate := request_remote_info(gallery.str(), id) or {
-			println('Cannot fetch ${id} from ${gallery}')
+			eprintln('Cannot fetch ${id} from ${gallery}')
 			RemoteExtension{}
 		}
 
@@ -134,12 +134,12 @@ fn download_package_impl(ex RemoteExtension, attempt int) ?string {
 	}
 
 	_, path := util.temp_file(tmp_opts) or {
-		println('Failed to create temporary file for ${ex.id}: ${err}')
+		eprintln('Failed to create temporary file for ${ex.id}: ${err}')
 		return none
 	}
 
 	http.download_file(ex.package_url, path) or {
-		println('Failed to download ${ex.id}: ${err}')
+		eprintln('Failed to download ${ex.id}: ${err}')
 		return if attempt < 2 { download_package_impl(ex, attempt + 1) } else { none }
 	}
 
@@ -175,7 +175,7 @@ fn match_remote_extension(exts RemoteExtensions, id string) RemoteExtension {
 
 	if exts.results.len > 0 && exts.results[0].extensions.len > 0 {
 		compatible_version := find_compatible_version(exts.results[0].extensions[0].versions) or {
-			println('Cannot find compatible version of ${id}')
+			eprintln('Cannot find compatible version of ${id}')
 			RemoteVersion{}
 		}
 
@@ -183,7 +183,7 @@ fn match_remote_extension(exts RemoteExtensions, id string) RemoteExtension {
 		ext.version = compatible_version.version
 
 		ext.package_url = find_package_url(compatible_version.files) or {
-			println('Cannot find download URL for ${id}')
+			eprintln('Cannot find download URL for ${id}')
 			''
 		}
 	}
@@ -226,7 +226,7 @@ fn request_remote_info(url string, id string) ?RemoteExtension {
 
 fn request_remote_info_impl(url string, id string, attempt int) ?RemoteExtension {
 	resp := build_info_request(url, id).do() or {
-		println('Failed to request remote ${url} for ${id}: ${err}')
+		eprintln('Failed to request remote ${url} for ${id}: ${err}')
 		return none
 	}
 
@@ -234,13 +234,13 @@ fn request_remote_info_impl(url string, id string, attempt int) ?RemoteExtension
 
 	if resp.status() == http.Status.ok {
 		exts := json.decode(RemoteExtensions, resp.body) or {
-			println('Failed to parse response for ${id} from ${url}: ${err}')
+			eprintln('Failed to parse response for ${id} from ${url}: ${err}')
 			RemoteExtensions{}
 		}
 
 		return match_remote_extension(exts, id)
 	} else {
-		println('Failed to request ${id}: ${url} => code ${resp.status_code} (attempt ${attempt + 1})')
+		eprintln('Failed to request ${id}: ${url} => code ${resp.status_code} (attempt ${attempt + 1})')
 	}
 
 	return if attempt < 2 { request_remote_info_impl(url, id, attempt + 1) } else { none }

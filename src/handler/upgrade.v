@@ -45,12 +45,14 @@ pub fn upgrade(args []string) {
 		local_ver := installed[c.pos].get_version()
 		remote_ver := remote_ext.get_version()
 
+		println('Processing ${c.id}...')
+
 		if remote_ver > local_ver {
 			tmp_file := extension.download_package(remote_ext) or { continue }
 			paths := create_upgrade_paths(c, local_ver.str(), remote_ver.str(), tmp_file)
 
 			szip.extract_zip_to_dir(tmp_file, paths.temp.unpack) or {
-				println('Failed to extract archive of ${c.id}: ${err}')
+				eprintln('Failed to extract archive of ${c.id}: ${err}')
 				continue
 			}
 
@@ -59,17 +61,19 @@ pub fn upgrade(args []string) {
 				paths.temp.extension: paths.install.new
 			} {
 				os.mv(src, dest, os.MvParams{ overwrite: true }) or {
-					println('Failed to install extension files for ${c.id}: ${err}')
+					eprintln('Failed to install extension files for ${c.id}: ${err}')
 					continue
 				}
 			}
 
-			os.rm(tmp_file) or { println('Failed to remove temp .vsix package of ${c.id}: ${err}') }
+			os.rm(tmp_file) or {
+				eprintln('Failed to remove temp .vsix package of ${c.id}: ${err}')
+			}
 
 			for path in [paths.temp.unpack, paths.install.old] {
 				if os.exists(path) {
 					os.rmdir_all(paths.install.old) or {
-						println('Failed to remove directory ${path}: ${err}')
+						eprintln('Failed to remove directory ${path}: ${err}')
 					}
 				}
 			}
@@ -102,7 +106,7 @@ pub fn upgrade(args []string) {
 	if count > 0 {
 		println('\n${count} extensions were upgraded')
 	} else {
-		println('All extensions are up-to-date')
+		println('\nAll extensions are up-to-date')
 	}
 }
 
@@ -161,7 +165,7 @@ fn create_upgrade_paths(candidate UpgradeCandidate, local_ver string, remote_ver
 
 	for path in [config.dir.path, paths.temp.unpack] {
 		os.mkdir_all(path, os.MkdirParams{ mode: 0o755 }) or {
-			println('Failed to create path ${path}: ${err}')
+			eprintln('Failed to create path ${path}: ${err}')
 			continue
 		}
 	}
