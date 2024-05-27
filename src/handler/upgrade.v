@@ -35,8 +35,8 @@ struct UpgradeCandidate {
 	pos  int // Entry position in original config file
 }
 
-pub fn upgrade(args []string) {
-	mut installed, candidates := get_upgrade_candidates(args)
+pub fn upgrade(args []string, use_proprierary bool) {
+	mut installed, candidates := get_upgrade_candidates(args, use_proprierary)
 	mut count := 0
 
 	for c in candidates {
@@ -49,7 +49,8 @@ pub fn upgrade(args []string) {
 
 		if remote_ver > local_ver {
 			tmp_file := extension.download_package(remote_ext) or { continue }
-			paths := create_upgrade_paths(c, local_ver.str(), remote_ver.str(), tmp_file)
+			paths := create_upgrade_paths(c, local_ver.str(), remote_ver.str(), tmp_file,
+				use_proprierary)
 
 			szip.extract_zip_to_dir(tmp_file, paths.temp.unpack) or {
 				eprintln('Failed to extract archive of ${c.id}: ${err}')
@@ -96,7 +97,7 @@ pub fn upgrade(args []string) {
 				}
 			}
 
-			utils.rewrite_config_file(json.encode_pretty(installed))
+			utils.rewrite_config_file(json.encode_pretty(installed), use_proprierary)
 
 			println('${c.id} ${local_ver} -> ${remote_ver}')
 			count++
@@ -110,8 +111,8 @@ pub fn upgrade(args []string) {
 	}
 }
 
-fn get_upgrade_candidates(args []string) ([]extension.LocalExtension, []UpgradeCandidate) {
-	installed := extension.get_local()
+fn get_upgrade_candidates(args []string, use_proprierary bool) ([]extension.LocalExtension, []UpgradeCandidate) {
+	installed := extension.get_local(use_proprierary)
 	mut candidates := []UpgradeCandidate{}
 
 	if args.len > 0 {
@@ -145,8 +146,8 @@ fn get_upgrade_candidates(args []string) ([]extension.LocalExtension, []UpgradeC
 	return installed, candidates
 }
 
-fn create_upgrade_paths(candidate UpgradeCandidate, local_ver string, remote_ver string, downloaded_file string) UpgradePaths {
-	config := utils.get_config()
+fn create_upgrade_paths(candidate UpgradeCandidate, local_ver string, remote_ver string, downloaded_file string, use_proprierary bool) UpgradePaths {
+	config := utils.get_config(use_proprierary)
 
 	paths := UpgradePaths{
 		install: InstallDir{

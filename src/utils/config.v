@@ -32,8 +32,9 @@ pub fn (cf ConfigFile) str() string {
 	return 'Config file: ${cf.path} (exists: ${cf.exists})'
 }
 
-pub fn get_config() Config {
-	dir_path := os.join_path(os.home_dir(), '.vscode-oss', 'extensions')
+pub fn get_config(use_proprierary bool) Config {
+	dot_dir := if use_proprierary { '.vscode' } else { '.vscode-oss' }
+	dir_path := os.join_path(os.home_dir(), dot_dir, 'extensions')
 	file_path := os.join_path_single(dir_path, 'extensions.json')
 
 	return Config{
@@ -48,8 +49,8 @@ pub fn get_config() Config {
 	}
 }
 
-pub fn rewrite_config_file(content string) {
-	os.write_file(get_config().file.path, content) or {
+pub fn rewrite_config_file(content string, use_proprierary bool) {
+	os.write_file(get_config(use_proprierary).file.path, content) or {
 		eprintln('Failed to rewrite config file: ${err}')
 		exit(-1)
 	}

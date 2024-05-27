@@ -51,8 +51,8 @@ pub fn (ex LocalExtension) str() string {
 	return '${ex.get_id()} ${ex.get_version()}'
 }
 
-pub fn get_local() []LocalExtension {
-	config_path := utils.get_config().file.path
+pub fn get_local(use_proprierary bool) []LocalExtension {
+	config_path := utils.get_config(use_proprierary).file.path
 
 	if !os.exists(config_path) {
 		eprintln('Config file does not exist: ${config_path}')

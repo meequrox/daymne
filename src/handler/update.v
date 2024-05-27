@@ -3,10 +3,10 @@ module handler
 import src.extension
 import os
 
-pub fn update() {
+pub fn update(use_proprierary bool) {
 	mut count := 0
 
-	for ex in extension.get_local() {
+	for ex in extension.get_local(use_proprierary) {
 		local_ver := ex.get_version()
 		remote_ver := extension.get_remote(ex.get_id()).get_version()
 

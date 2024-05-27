@@ -8,9 +8,10 @@ fn build_subcommands() []cli.Command {
 	return [
 		cli.Command{
 			name: 'info'
-			description: 'Print information related to "Code - OSS"'
+			description: 'Print information related to Visual Studio Code configuration'
 			execute: fn (cmd cli.Command) ! {
-				handler.info()
+				use_proprierary := cmd.flags.get_bool('proprietary') or { false }
+				handler.info(use_proprierary)
 				return
 			}
 			posix_mode: true
@@ -27,7 +28,8 @@ fn build_subcommands() []cli.Command {
 			name: 'list'
 			description: 'Print installed extensions'
 			execute: fn (cmd cli.Command) ! {
-				handler.list()
+				use_proprierary := cmd.flags.get_bool('proprietary') or { false }
+				handler.list(use_proprierary)
 				return
 			}
 			posix_mode: true
@@ -44,7 +46,8 @@ fn build_subcommands() []cli.Command {
 			name: 'update'
 			description: 'Print extensions that can be updated to a newer version'
 			execute: fn (cmd cli.Command) ! {
-				handler.update()
+				use_proprierary := cmd.flags.get_bool('proprietary') or { false }
+				handler.update(use_proprierary)
 				return
 			}
 			posix_mode: true
@@ -61,7 +64,8 @@ fn build_subcommands() []cli.Command {
 			name: 'upgrade'
 			description: 'Download and install a newer version of the extension(s)'
 			execute: fn (cmd cli.Command) ! {
-				handler.upgrade(cmd.args)
+				use_proprierary := cmd.flags.get_bool('proprietary') or { false }
+				handler.upgrade(cmd.args, use_proprierary)
 				return
 			}
 			posix_mode: true
@@ -80,8 +84,8 @@ fn build_subcommands() []cli.Command {
 fn main() {
 	mut app := cli.Command{
 		name: 'daymne'
-		description: 'Command line extension updater for "Code - OSS" text editor'
-		version: '1.0.2'
+		description: 'Command line extension updater for Visual Studio Code text editor'
+		version: '1.1.0'
 		execute: fn (cmd cli.Command) ! {
 			handler.main(cmd.help_message())
 			return
@@ -89,6 +93,16 @@ fn main() {
 		commands: build_subcommands()
 		posix_mode: true
 		sort_flags: true
+		flags: [
+			cli.Flag{
+				flag: cli.FlagType.bool
+				name: 'proprietary'
+				abbrev: 'p'
+				description: 'Use proprietary build configuration (.vscode) instead of OSS one (.vscode-oss)'
+				global: true
+				required: false
+			},
+		]
 		defaults: struct {
 			help: cli.CommandFlag{
 				command: false
