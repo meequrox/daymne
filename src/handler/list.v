@@ -1,7 +1,6 @@
 module handler
 
-import extension
-// ^^ local
+import src.extension
 
 pub fn list() {
 	for ex in extension.get_local() {

@@ -1,7 +1,6 @@
 module handler
 
-import extension
-// ^^ local
+import src.extension
 import os
 
 pub fn update() {

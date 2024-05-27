@@ -1,7 +1,6 @@
 module main
 
-import handler
-// ^^ local
+import src.handler
 import os
 import cli
 
@@ -82,7 +81,7 @@ fn main() {
 	mut app := cli.Command{
 		name: 'daymne'
 		description: 'Command line extension updater for "Code - OSS" text editor'
-		version: '0.6.0'
+		version: '1.0.0'
 		execute: fn (cmd cli.Command) ! {
 			handler.main(cmd.help_message())
 			return

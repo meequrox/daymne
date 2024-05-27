@@ -1,8 +1,7 @@
 module handler
 
-import extension
-import utils
-// ^^ local
+import src.extension
+import src.utils
 
 pub fn info() {
 	config := utils.get_config()

@@ -1,8 +1,7 @@
 module handler
 
-import extension
-import utils
-// ^^ local
+import src.extension
+import src.utils
 import os
 import compress.szip
 import json
@@ -102,6 +101,8 @@ pub fn upgrade(args []string) {
 
 	if count > 0 {
 		println('\n${count} extensions were upgraded')
+	} else {
+		println('All extensions are up-to-date')
 	}
 }
 
